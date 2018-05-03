@@ -1,0 +1,107 @@
+---
+title: "Model comparison and expansion"
+author: "Connor Gilroy"
+date: "2018-05-03"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Resources
+
+About generalized linear models, including the poisson and negative binomial:
+
+https://jrnold.github.io/bayesian_notes/generalized-linear-models.html
+
+http://mc-stan.org/rstanarm/articles/count.html
+
+About model comparison: 
+
+http://mc-stan.org/loo/articles/loo2-example.html
+
+About the dispersion parameter for the negative binomial distribution:
+
+https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations
+
+http://andrewgelman.com/2018/04/03/justify-my-love/
+
+# Setup
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(rstan)
+library(rstanarm)
+library(loo)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+# Data
+
+```{r}
+data(roaches)
+roaches <- as_tibble(roaches)
+```
+
+```{r}
+covariates <- 
+  roaches %>%
+  mutate(roach1 = scale(roach1)) %>%
+  dplyr::select(roach1, treatment, senior) 
+
+d <- list(
+  y = roaches$y,
+  x = as.matrix(covariates),
+  offset = roaches$exposure2
+)
+
+d$N <- length(d$y)
+d$K <- ncol(d$x)
+```
+
+# Models
+
+## Poisson
+
+```{r message=FALSE, warning=FALSE, results='hide'}
+poisson_fit <- stan("stan/poisson.stan", data = d)
+```
+
+```{r}
+print(poisson_fit, pars = c("a", "b"))
+```
+
+## Negative binomial
+
+```{r message=FALSE, warning=FALSE, results="hide"}
+neg_binomial_fit <- stan("stan/neg_binomial.stan", data = d)
+```
+
+```{r}
+print(neg_binomial_fit, pars = c("a", "b", "phi"))
+```
+
+# LOO-CV
+
+```{r}
+loo_poisson <- loo(extract_log_lik(poisson_fit))
+loo_poisson
+```
+
+```{r}
+loo_neg_binomial <- loo(extract_log_lik(neg_binomial_fit))
+loo_neg_binomial
+```
+
+```{r}
+compare(loo_poisson, loo_neg_binomial)
+```
+
+# WAIC
+
+```{r}
+compare(
+  waic(extract_log_lik(poisson_fit)),
+  waic(extract_log_lik(neg_binomial_fit))
+)
+```
