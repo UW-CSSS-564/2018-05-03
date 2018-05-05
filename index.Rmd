@@ -32,6 +32,7 @@ library(tidyverse)
 library(rstan)
 library(rstanarm)
 library(loo)
+library(bayesplot)
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 ```
@@ -68,7 +69,7 @@ poisson_fit <- stan("stan/poisson.stan", data = d)
 ```
 
 ```{r}
-print(poisson_fit, pars = c("a", "b"))
+print(poisson_fit, pars = c("a", "b", "lp__"))
 ```
 
 ## Negative binomial
@@ -105,3 +106,30 @@ compare(
   waic(extract_log_lik(neg_binomial_fit))
 )
 ```
+
+# PPC 
+
+See this vignette for extracting information from a `stanfit` object: 
+
+http://mc-stan.org/rstan/articles/stanfit_objects.html
+
+```{r}
+yrep_pois <- rstan::extract(poisson_fit, pars = "y_rep")$y_rep
+yrep_pois_alt <- as.matrix(poisson_fit, pars = "y_rep")
+# extract() permutes the order of the draws, 
+# so these two matrices aren't in the same order
+
+ppc_dens_overlay(y = d$y, yrep = yrep_pois[1:50, ]) + xlim(0, 100)
+# changing xlim to ignore the long tail
+```
+
+```{r}
+yrep_nb <- rstan::extract(neg_binomial_fit, pars = "y_rep")$y_rep
+yrep_pois_alt <- as.matrix(neg_binomial_fit, pars = "y_rep")
+# extract() permutes the order of the draws, 
+# so these two matrices aren't in the same order
+
+ppc_dens_overlay(y = d$y, yrep = yrep_nb[1:50, ]) + xlim(0, 100)
+# changing xlim to ignore the VERY long tail
+```
+
